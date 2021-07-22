@@ -1,0 +1,145 @@
+---
+title: "Movie Industry Project"
+author: "By Jesse"
+output: html_document
+---
+
+##### In this I project I explore movie industry data and look for correlation between variables.
+
+##### There are 6820 movies in the dataset (220 movies per year, 1986-2016). This data was scraped from IMDb.
+
+#### Each movie has the following attributes:
+
+* budget: the budget of a movie. Some movies don't have this, so it appears as 0
+* company: the production company
+* country: country of origin
+* director: the director
+* genre: main genre of the movie.
+* gross: revenue of the movie
+* name: name of the movie
+* rating: rating of the movie (R, PG, etc.)
+* released: release date (YYYY-MM-DD)
+* runtime: duration of the movie
+* score: IMDb user rating
+* votes: number of user votes
+* star: main actor/actress
+* writer: writer of the movie
+* year: year of release
+
+<br>
+
+Let's get started!
+
+Loading in packages, removing objects from the environment and setting the working directory
+
+```{r packages and wd, message=FALSE, warning=FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman)
+pacman::p_load(tidyverse, caTools, lubridate,
+               ggthemes, janitor, corrplot, GGally, psych)
+
+rm(list=ls())
+setwd("/Users/Jesse/R/MovieIndustryProject/")
+```
+
+Reading in the data
+
+```{r reading in the data, message=FALSE, warning=FALSE}
+df <- read_csv("/Users/Jesse/R/MovieIndustryProject/movies.csv")
+```
+
+Let's take a took at the data
+
+```{r checking out the data}
+head(df)
+str(df)
+```
+
+Finally, let's check for any missing values:
+
+```{r missing}
+any(is.na(df))
+```
+
+No missing data! Let's move on to basic data cleaning.
+
+```{r data cleaning}
+df$year_corrected <- as.numeric(str_sub(df$released, 1, 4)) # fixing years not matching
+
+df <- df %>% arrange(desc(gross)) # sorting by highest grossing movies
+options(scipen = 999) # get rid of scientific notation
+
+get_dupes(df)
+
+head(df)
+```
+
+We created a new column to fix an issue with the release date and year not matching. Then we sort by highest grossing movies and check for any duplicates.
+
+<br>
+
+#### Looking for correlation
+
+```{r corr}
+df %>% ggplot(aes(budget, gross)) + geom_point(color = "red", alpha = .5) + 
+    ggtitle("Budget vs Gross Earnings",) + theme_bw() + theme(plot.title = element_text(hjust = .5)) +
+    geom_smooth(method = "lm")
+```
+<br>
+
+Above is a scatterplot showing the relationship between budget and gross earnings.
+
+```{r corr2}
+df_cor <- df[,c(1,6,10,11,13,16)] # using only numeric features
+cor(df_cor)
+ggpairs(df_cor) # matrix of plots
+
+cor_mx <- cor(df_cor) 
+corrplot(cor_mx,method = "color", title = "Correlation Matrix for Numeric Features", 
+         mar=c(0,0,1,0))
+```
+<br>
+
+It looks like budget and votes have fairly strong positive correlation with gross earnings.
+
+Next, let's convert the character columns to factors then numeric values to be included in the correlation matrix
+
+```{r corr3}
+# create numeric factor for all character columns
+numeric_factor <- function(x){
+    as.numeric(as.factor(x))
+}
+
+df_numfac <- df # creating frame to change characters to factored numeric values
+df_numfac[,c(2:5,7,8,12,14)] <- lapply(df_numfac[,c(2:5,7,8,12,14)], numeric_factor) # converting non-numeric
+                                                                                     # to factored numeric
+
+cor(df_numfac[,c(-9,-15)]) # correlation with all features - removing old release date and release year
+cor_numfac_mx <- cor(df_numfac[,c(-9,-15)]) # creating correlation matrix 
+corrplot(cor_numfac_mx, method = "color", title = "Correlation Matrix for All Features", 
+         mar=c(0,0,1,0)) # correlation plot
+```
+<br>
+
+It looks like both budget and votes are still the most highly correlated with gross earnings, both showing fairly strong positive correlation.
+
+Finally, let's look only at gross earnings in the correlation matrix
+
+```{r corr4}
+cor_gross <- cor(df_numfac[,c(-6,-9,-15)], df_numfac$gross) # matrix of only correlation w/ gross
+cor_gross <- as.matrix(cor_gross[order(cor_gross[,1], decreasing = T),]) # ordered by highest correlation
+cor_gross
+
+colnames(cor_gross) <- c("gross") # changing column name
+
+high_cor_gross <- cor_gross[cor_gross[,1] >= .5,, drop = F] # budget and votes have highest correlation w/ gross
+high_cor_gross
+```
+<br>
+
+There you have it. Budget and votes have the highest correlation with gross earnings. This is about what you would expect, having a high budget for a movie generally produces a better product, thus earning more. It was interesting to learn the correlation between user votes and the gross earnings for a movie. I was somewhat surprised company did not have a higher correlation with gross earnings. I would have expected some companies, such as Disney, 20th Century Fox, Universal Pictures, etc. to have bring in more money based on their brand name. 
+
+
+
+
+
+
